@@ -99,3 +99,41 @@ md ls
 ```powershell
 uv run python -m unittest discover -s tests -v
 ```
+
+## 打包 Windows EXE
+
+项目使用 PyInstaller 生成单文件命令行程序：
+
+```powershell
+.\scripts\build.ps1
+```
+
+生成结果：
+
+```text
+dist\md.exe
+```
+
+运行：
+
+```powershell
+.\dist\md.exe ls
+.\dist\md.exe push C:\path\to\.vimrc
+.\dist\md.exe get .vimrc
+.\dist\md.exe rm .vimrc
+```
+
+`md.exe` 不包含账号密码。将 `md.toml` 放在运行命令时的当前目录，或者放到：
+
+```text
+%APPDATA%\md\config.toml
+```
+
+也可以用环境变量指定：
+
+```powershell
+$env:MD_CONFIG = "D:\private\md.toml"
+.\dist\md.exe ls
+```
+
+PyInstaller 只能为当前操作系统生成程序；Windows 版需要在 Windows 上构建。
