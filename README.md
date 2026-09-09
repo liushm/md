@@ -9,6 +9,58 @@ $env:UV_CACHE_DIR = "$PWD\.uv-cache"
 uv sync
 ```
 
+## 在 Linux / macOS 上安装
+
+项目尚未发布到 PyPI，因此需要从源码目录或 wheel 文件安装。
+
+推荐使用 `pipx`，命令会安装到独立环境并加入 PATH：
+
+```bash
+cd /path/to/md-webdav
+pipx install .
+```
+
+也可以使用普通虚拟环境：
+
+```bash
+cd /path/to/md-webdav
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install .
+md --help
+```
+
+开发模式安装：
+
+```bash
+python -m pip install -e .
+```
+
+或者先构建跨平台 wheel：
+
+```bash
+uv build
+python3 -m pip install dist/md_webdav-0.1.0-py3-none-any.whl
+```
+
+Linux 和 macOS 的配置建议放在：
+
+```text
+~/.config/md/config.toml
+```
+
+```bash
+mkdir -p ~/.config/md
+cp md.example.toml ~/.config/md/config.toml
+chmod 600 ~/.config/md/config.toml
+```
+
+如果系统上已经存在同名 `md` 命令，可以始终使用：
+
+```bash
+python -m md_webdav ls
+```
+
 ## 配置
 
 复制示例配置：
