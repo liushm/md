@@ -1,0 +1,8 @@
+[webdav]
+base_url = "https://dav.example.com"
+remote_dir = "/backup"
+username = "username"
+password = "password"
+proxy = "socks5h://127.0.0.1:7890"
+timeout_seconds = 120.0
+max_size_mib = 5

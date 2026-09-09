@@ -4,7 +4,14 @@ import tempfile
 import unittest
 from pathlib import Path, PurePosixPath
 
-from md_webdav.store import MdError, Store, local_size
+from md_webdav.store import (
+    MdError,
+    RemoteEntry,
+    Store,
+    display_width,
+    format_entries,
+    local_size,
+)
 
 
 class FakeClient:
@@ -137,6 +144,43 @@ class StoreTests(unittest.TestCase):
 
         with self.assertRaisesRegex(MdError, "本地已存在"):
             self.store.get("a.txt", local)
+
+
+    def test_remove_file_and_reject_missing_name(self) -> None:
+        self.client.mkdir("/backup")
+        source = self.root / "a.txt"
+        source.write_text("remote", encoding="utf-8")
+        self.client.upload_file(source, "/backup/a.txt")
+
+        name, kind = self.store.remove("a.txt", lambda *_: True)
+
+        self.assertEqual((name, kind), ("a.txt", "file"))
+        self.assertNotIn("/backup/a.txt", self.client.entries)
+        with self.assertRaisesRegex(MdError, "不存在"):
+            self.store.remove("a.txt", lambda *_: True)
+
+    def test_remove_can_be_cancelled(self) -> None:
+        self.client.mkdir("/backup")
+        source = self.root / "a.txt"
+        source.write_text("remote", encoding="utf-8")
+        self.client.upload_file(source, "/backup/a.txt")
+
+        with self.assertRaisesRegex(MdError, "取消"):
+            self.store.remove("a.txt", lambda *_: False)
+
+        self.assertIn("/backup/a.txt", self.client.entries)
+
+    def test_list_output_aligns_chinese_and_ascii_names(self) -> None:
+        lines = format_entries(
+            [
+                RemoteEntry("a.md", "file", 1024),
+                RemoteEntry("中文笔记.md", "file", 10 * 1024),
+            ]
+        )
+
+        first_size_column = display_width(lines[0][: lines[0].index("1.00 KiB")])
+        second_size_column = display_width(lines[1][: lines[1].index("10.00 KiB")])
+        self.assertEqual(first_size_column, second_size_column)
 
     def test_list_includes_recursive_directory_size(self) -> None:
         folder = self.root / "folder"

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
+import unicodedata
 from typing import Callable, Protocol
 
 
@@ -41,6 +42,32 @@ def human_size(size: int) -> str:
             return f"{value:.0f} {unit}" if unit == "B" else f"{value:.2f} {unit}"
         value /= 1024
     return f"{size} B"
+
+
+def display_width(text: str) -> int:
+    width = 0
+    for char in text:
+        if unicodedata.combining(char):
+            continue
+        width += 2 if unicodedata.east_asian_width(char) in {"W", "F"} else 1
+    return width
+
+
+def pad_display(text: str, width: int) -> str:
+    return text + " " * max(0, width - display_width(text))
+
+
+def format_entries(entries: list[RemoteEntry]) -> list[str]:
+    if not entries:
+        return []
+
+    names = [entry.name + ("/" if entry.kind == "directory" else "") for entry in entries]
+    sizes = [human_size(entry.size) for entry in entries]
+    name_width = max(display_width(name) for name in names)
+    return [
+        f"{pad_display(name, name_width)}  {size}"
+        for name, size in zip(names, sizes)
+    ]
 
 
 def local_size(path: Path) -> int:
@@ -147,6 +174,19 @@ class Store:
             else:
                 self.client.download_file(remote_item, local_item)
 
+    def remove(self, name: str, confirm: Callable[[str, str], bool]) -> tuple[str, str]:
+        name = validate_remote_name(name)
+        remote_target = join_remote(self.remote_dir, name)
+        if not self.client.exists(remote_target):
+            raise MdError(f"远程内容不存在：{name}")
+
+        kind = "directory" if self.client.isdir(remote_target) else "file"
+        if not confirm(name, kind):
+            raise MdError("已取消删除")
+
+        self.client.remove(remote_target)
+        return name, kind
+
     def list_entries(self) -> list[RemoteEntry]:
         if not self.client.exists(self.remote_dir):
             return []
@@ -175,4 +215,3 @@ class Store:
             else:
                 total += int(item.get("content_length") or item.get("size") or 0)
         return total
-

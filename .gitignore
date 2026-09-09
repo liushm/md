@@ -9,5 +9,6 @@ wheels/
 # Virtual environments
 .venv
 
-src/md_webdav/config.py
+# Local credentials
+md.toml
 
