@@ -5,6 +5,8 @@ from pathlib import Path, PurePosixPath
 import unicodedata
 from typing import Callable, Protocol
 
+from webdav4.client import ResourceAlreadyExists
+
 
 class MdError(Exception):
     """An expected, user-facing error."""
@@ -99,6 +101,19 @@ class Store:
         self.remote_dir = join_remote(remote_dir)
         self.size_limit = size_limit
 
+    def _mkdir(self, path: str, *, allow_existing: bool = False) -> None:
+        try:
+            self.client.mkdir(path)
+        except ResourceAlreadyExists as exc:
+            if self.client.exists(path):
+                if allow_existing:
+                    return
+                raise MdError(f"远程已存在同名内容：{PurePosixPath(path).name}") from exc
+            raise MdError(
+                "服务端拒绝创建远程文件夹（MKCOL 返回 HTTP 405）。"
+                "请检查 WebDAV 地址、目录写入权限或反向代理配置。"
+            ) from exc
+
     def _ensure_remote_dir(self) -> None:
         current = ""
         for part in PurePosixPath(self.remote_dir).parts:
@@ -106,7 +121,7 @@ class Store:
                 continue
             current = join_remote(current, part)
             if not self.client.exists(current):
-                self.client.mkdir(current)
+                self._mkdir(current, allow_existing=True)
 
     def push(self, source: Path, confirm: Callable[[int], bool]) -> tuple[str, int]:
         source = source.expanduser().resolve()
@@ -124,13 +139,13 @@ class Store:
             self.client.upload_file(source, remote_target, overwrite=False)
             return source.name, size
 
-        self.client.mkdir(remote_target)
+        self._mkdir(remote_target)
         try:
             for item in sorted(source.rglob("*"), key=lambda p: (len(p.parts), str(p))):
                 relative = item.relative_to(source).as_posix()
                 remote_item = join_remote(remote_target, relative)
                 if item.is_dir():
-                    self.client.mkdir(remote_item)
+                    self._mkdir(remote_item)
                 elif item.is_file():
                     self.client.upload_file(item, remote_item, overwrite=False)
         except Exception:

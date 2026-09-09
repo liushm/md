@@ -4,6 +4,8 @@ import tempfile
 import unittest
 from pathlib import Path, PurePosixPath
 
+from webdav4.client import ResourceAlreadyExists
+
 from md_webdav.store import (
     MdError,
     RemoteEntry,
@@ -115,6 +117,20 @@ class StoreTests(unittest.TestCase):
             store.push(source, lambda _: False)
 
         self.assertNotIn("/backup/large.bin", self.client.entries)
+
+    def test_directory_push_reports_unsupported_mkcol(self) -> None:
+        class NoMkcolClient(FakeClient):
+            def mkdir(self, path: str) -> None:
+                if self.norm(path) == "/backup/vmess":
+                    raise ResourceAlreadyExists(path)
+                super().mkdir(path)
+
+        source = self.root / "vmess"
+        source.mkdir()
+        store = Store(NoMkcolClient(), "/backup", 5 * 1024 * 1024)
+
+        with self.assertRaisesRegex(MdError, "MKCOL"):
+            store.push(source, lambda _: True)
 
     def test_push_and_get_directory(self) -> None:
         source = self.root / "config"
